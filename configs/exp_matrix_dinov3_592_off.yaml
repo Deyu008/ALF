@@ -1,0 +1,38 @@
+# Experiment matrix (C): DINOv3@592 + modules OFF (baseline)
+#
+# Dataset fields (`dataset_name`, `data_path`) are typically overridden by the runner script.
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 592
+  divide_num: 1
+
+models:
+  backbone_name: "dinov3_vitl16"
+  pretrained: "facebook"
+  batch_size: 4
+  # Stabilize image-level similarity scale for DINO features (CLIP already normalizes).
+  l2_normalize_image_features: true
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # All optional modules disabled (baseline).
+  use_hier_fusion: false
+  adaptive_r_fusion:
+    enabled: false
+  adaptive_layer_fusion:
+    enabled: false
+
+device: 0
+
+transductive:
+  enabled: false
+
+testing:
+  output_dir: "output/exp_matrix_dinov3_592_off"
+  vis: false
+  vis_type: single_norm
+  save_excel: true
+

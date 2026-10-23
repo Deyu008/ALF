@@ -1,0 +1,36 @@
+# AMSF disabled baseline for comparison
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  adaptive_r_fusion:
+    enabled: false
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    calibration_enabled: false
+    calibration_method: "mean_std"
+    calibration_quantiles: [0.1, 0.9]
+    shrink_to_uniform: 0.0
+    log_weights: false
+
+device: 1
+
+testing:
+  output_dir: "output_amsf_off"
+  vis: False
+  vis_type: single_norm
+  save_excel: True

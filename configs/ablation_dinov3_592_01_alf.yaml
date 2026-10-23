@@ -1,0 +1,46 @@
+# Ablation (1/8): +ALF only (layer fusion), without gate/calib/patchgate/transductive.
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 592
+  divide_num: 1
+
+models:
+  backbone_name: "dinov3_vitl16"
+  pretrained: "facebook"
+  batch_size: 4
+  l2_normalize_image_features: true
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+  msm_cdist_chunk_size: 16
+
+  adaptive_layer_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.02
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+    log_weights: true
+
+    consistency_gate_enabled: false
+    calibration_enabled: false
+    patch_gate_enabled: false
+
+  adaptive_r_fusion:
+    enabled: false
+
+device: 0
+
+transductive:
+  enabled: false
+
+testing:
+  output_dir: "output/ablation_dinov3_592_01_alf"
+  vis: false
+  vis_type: single_norm
+  save_excel: true
+

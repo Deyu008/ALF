@@ -1,0 +1,44 @@
+datasets:
+  dataset_name: 'mvtec_ad'  # choice ['mvtec_ad', 'visa', 'btad']
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: 'screw'  # or 'all'
+  img_resize: 518
+  divide_num: 1
+models:
+  backbone_name: 'dinov3_vitl16'
+  pretrained: 'facebook'
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+  use_hier_fusion: true
+  hier_fusion:
+    temperature: 0.7
+    top_p: 0.9
+    # 先设为最优 Fixed Gate 的 lambda_patch=λ*，或用校准脚本输出的 lambda_patch_recommended
+    lambda_patch: 0.3
+    patch_mode: 'mult'
+    # B_fixed_gate 基线中不做 image-level CLS 重新评分
+    gamma_img: 0.0
+    cls_topk_ratio: 0.3
+    adaptive:
+      enabled: true
+      # 用 scripts/calibrate_hier_fusion.py 从 fixed 统计中给出的分位数替换
+      neff_floor: 1.5
+      neff_ceil: 4.0
+      # 收窄到 1 附近，使自适应只做微调
+      lambda_min_scale: 0.9
+      lambda_max_scale: 1.1
+      log_stats: true
+      # 先关闭额外自适应项，等 λ 校准稳定后再逐个打开做 ablation
+      top_p_enabled: false
+      top_p_min: 0.88
+      top_p_max: 0.92
+      temperature_enabled: false
+      temperature_min: 0.7
+      temperature_max: 0.9
+device: 1
+testing:
+  output_dir: 'output_hier_adaptive_calibrated'
+  vis: True
+  vis_type: single_norm # choice ['single_norm', 'whole_norm']
+  save_excel: True

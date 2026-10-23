@@ -1,0 +1,34 @@
+# Smoke test for AMSF v2 (saliency-based weighting)
+# Only tests screw category for quick validation
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "screw"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # AMSF v2: saliency-based weighting
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "saliency"
+    temperature: 0.1
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    log_weights: true
+
+device: 1
+
+testing:
+  output_dir: "output_smoke_amsf_v2"
+  vis: False
+  vis_type: single_norm
+  save_excel: True

@@ -1,0 +1,57 @@
+# Exp: ALF sharpness-consistency with Inductive Normal Bank (train split normal refs) on DINOv3@592 (core-e01)
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 592
+  divide_num: 1
+
+models:
+  backbone_name: "dinov3_vitl16"
+  pretrained: "facebook"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # Keep computational knobs identical between ablations.
+  l2_normalize_image_features: true
+  msm_cdist_chunk_size: 16
+  use_hier_fusion: false
+
+  adaptive_layer_fusion:
+    enabled: true
+    weighting_method: "sharpness_consistency"
+    consistency_score_mix: 0.5
+    temperature: 0.2
+    weight_floor: 0.02
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+    log_weights: true
+
+    consistency_gate_enabled: false
+    calibration_enabled: false
+    patch_gate_enabled: false
+
+  adaptive_r_fusion:
+    enabled: false
+
+# Inductive Normal Bank (train split normal images)
+inductive_bank:
+  enabled: true
+  split: train
+  only_normal: true
+  max_images: -1        # -1 means use all available normal images
+  query_chunk_size: 1   # keep conservative for GPU memory
+
+device: 0
+
+transductive:
+  enabled: false
+
+testing:
+  output_dir: "output/exp_ablation_alf_sharpcons_dinov3_592_inductive_bank"
+  vis: false
+  vis_type: single_norm
+  save_excel: true

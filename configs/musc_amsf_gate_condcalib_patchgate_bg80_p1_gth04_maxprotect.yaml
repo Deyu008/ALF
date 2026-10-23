@@ -1,0 +1,73 @@
+# AMSF gate + conditional calibration + PatchGate++ (background-only + max-protect).
+#
+# This config is a conservative, cross-dataset setting that targets AUPRO
+# robustness without enabling always-on suppression.
+#
+# PatchGate++ key params:
+# - patch_gate_mode: background
+# - patch_gate_bg_percentile: 0.8
+# - patch_gate_power: 1.0
+# - patch_gate_gate_threshold: 0.4 (apply only on low-confidence samples)
+# - patch_gate_protect_source: max_scale
+# - patch_gate_protect_quantile: 0.99
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  msm_cdist_chunk_size: 8
+
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: true
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: 0.15
+    calibration_quantiles: [0.1, 0.9]
+
+    patch_gate_enabled: true
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.1
+    patch_gate_smooth_kernel: 0
+
+    # PatchGate++
+    patch_gate_mode: "background"
+    patch_gate_bg_percentile: 0.8
+    patch_gate_power: 1.0
+    patch_gate_protect_quantile: 0.99
+    patch_gate_protect_source: "max_scale"
+    patch_gate_gate_threshold: 0.4
+
+    log_weights: true
+
+device: 1
+
+testing:
+  output_dir: "output_amsf_gate_condcalib_patchgate_bg80_p1_gth04_maxprotect"
+  vis: False
+  vis_type: single_norm
+  save_excel: True

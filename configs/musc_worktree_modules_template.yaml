@@ -1,0 +1,191 @@
+# Standard config template for worktree-merged modules (baseline-preserving).
+#
+# This template enumerates all config keys introduced by worktree merges:
+# - AMSF / ALF (adaptive fusion) + Consistency Gate + Conditional Calibration + PatchGate
+# - MSM exact cdist chunking (memory control)
+# - Train-free transductive refinement (Pass-0/Pass-1 with bank refs)
+#
+# Notes:
+# - `examples/musc_main.py` may override `datasets.dataset_name`, `datasets.data_path`,
+#   `datasets.class_name`, `device`, `testing.output_dir` via CLI args.
+# - Boolean values use lowercase `true/false` to avoid YAML ambiguity.
+
+datasets:
+  dataset_name: "mvtec_ad"          # mvtec_ad | visa | btad
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"                # "ALL" or a single class name
+  img_resize: 512                  # CLIP commonly uses 512; DINOv3建议 592（可在实验中覆盖）
+  divide_num: 1
+  # Optional: run a subset when divide_num > 1.
+  # divide_iters: [0]
+
+models:
+  backbone_name: "ViT-L-14-336"     # CLIP: ViT-L-14-336; DINOv3: dinov3_vitl16
+  pretrained: "openai"             # CLIP: openai; DINOv3: facebook（仅占位，不影响 dinov3 loader）
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # Optional: L2-normalize image-level features (CLS embedding).
+  # - CLIP branch already normalizes; for DINO/DINOv3 this is off unless enabled.
+  l2_normalize_image_features: false
+
+  # MSM peak-memory control: exact cdist in chunks; 0 disables.
+  msm_cdist_chunk_size: 0
+
+  # ===============================
+  # Adaptive Layer Fusion (ALF)
+  # ===============================
+  adaptive_layer_fusion:
+    enabled: false
+
+    weighting_method: "sharpness"  # sharpness|contrast|gradient|entropy|kurtosis|consistency
+    temperature: 0.1
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.0
+    log_weights: true
+
+    # Consistency Gate (residual gating)
+    consistency_gate_enabled: false
+    consistency_method: "topk_overlap"  # topk_overlap|spearman|cosine
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+    consistency_gate_hard_floor: 0.0
+
+    # Conditional calibration (distribution alignment; affects global-threshold metrics like AUPRO)
+    calibration_enabled: false
+    calibration_method: "mean_std"  # mean_std|bg_mean_std|quantile|tail_quantile
+    calibration_quantiles: [0.1, 0.9]
+    calibration_bg_percentile: 0.9
+    calibration_consistency_threshold: -1.0
+    calibration_gate_threshold: -1.0
+    calibration_tail_anchor_quantile: 0.9
+    calibration_tail_quantile: 0.99
+    calibration_tail_scale_min: 0.5
+    calibration_tail_scale_max: 2.0
+    calibration_tail_clamp_to_ref: false
+
+    # PatchGate (usually keep disabled for ALF; enabled mostly on AMSF)
+    patch_gate_enabled: false
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.0
+    patch_gate_max: 1.0
+    patch_gate_smooth_kernel: 0
+    patch_gate_protect_quantile: -1.0
+    patch_gate_protect_source: "reference"  # reference|fused|max_scale
+    patch_gate_power: 1.0
+    patch_gate_mode: "all"
+    patch_gate_bg_percentile: 0.9
+    patch_gate_consistency_threshold: -1.0
+    patch_gate_gate_threshold: -1.0
+    patch_gate_apply_logic: "or"  # or|and
+
+  # ===============================
+  # Adaptive R Fusion (AMSF)
+  # ===============================
+  adaptive_r_fusion:
+    enabled: false
+
+    weighting_method: "sharpness"
+    temperature: 0.1
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.0
+    log_weights: true
+
+    # Consistency Gate (residual gating)
+    consistency_gate_enabled: false
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+    consistency_gate_hard_floor: 0.0
+
+    # Conditional calibration
+    calibration_enabled: false
+    calibration_method: "mean_std"
+    calibration_quantiles: [0.1, 0.9]
+    calibration_bg_percentile: 0.9
+    calibration_consistency_threshold: -1.0
+    calibration_gate_threshold: -1.0
+    calibration_tail_anchor_quantile: 0.9
+    calibration_tail_quantile: 0.99
+    calibration_tail_scale_min: 0.5
+    calibration_tail_scale_max: 2.0
+    calibration_tail_clamp_to_ref: false
+
+    # PatchGate (patch-wise residual gating)
+    patch_gate_enabled: false
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.0
+    patch_gate_max: 1.0
+    patch_gate_smooth_kernel: 0
+    patch_gate_protect_quantile: -1.0
+    patch_gate_protect_source: "reference"  # reference|fused|max_scale
+    patch_gate_power: 1.0
+    patch_gate_mode: "all"
+    patch_gate_bg_percentile: 0.9
+    patch_gate_consistency_threshold: -1.0
+    patch_gate_gate_threshold: -1.0
+    patch_gate_apply_logic: "or"
+
+device: 0
+
+# ===============================
+# Train-free Transductive Refinement
+# ===============================
+# Triggered only when:
+# - enabled: true
+# - num_passes >= 2
+transductive:
+  enabled: false
+  num_passes: 1
+
+  # Pass-0 image score pooling for bank selection
+  score_pool: "q99"              # max|q99|topk_mean
+
+  # Bank selection
+  bank_ratio_mode: "fixed"       # fixed|adaptive_knee
+  bank_ratio: 0.4
+  bank_ratio_min: 0.2
+  bank_ratio_max: 0.7
+  knee_strength_min: 0.03
+  knee_tail_frac: 0.85
+
+  # Bank decontamination (optional)
+  bank_filter: false
+
+  # Per-query retrieval within bank (optional)
+  retrieval_topk: 0
+
+  # MSM interval-mean parameters used in Pass-1
+  msm_topmin_min: 0.0
+  msm_topmin_max: 0.3
+
+  # Safe fusion between Pass-0 and Pass-1
+  safe_fusion: false
+  safe_fusion_weight: 0.5
+
+  # Adaptive fusion gate (confidence = knee_strength * kept_ratio)
+  adaptive_gate: false
+  gate_threshold: 0.05
+
+  # Whether transductive affects pixel maps (Route A = false)
+  apply_to_pixel: true
+
+testing:
+  output_dir: "output/template_worktree_modules"
+  vis: false
+  vis_type: single_norm
+  save_excel: true
+  # Image-level pooling for RsCIN input (default in code: max).
+  image_pool: "max"
+

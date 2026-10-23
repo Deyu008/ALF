@@ -1,0 +1,117 @@
+# Experiment matrix (B): CLIP@518 + modules ON (all-in-one)
+#
+# This is the CLIP@518 counterpart of the "all-on" config (AMSF + Gate + CondCalib + PatchGate + ALF)
+# with train-free transductive refinement enabled.
+#
+# Dataset fields (`dataset_name`, `data_path`) are typically overridden by the runner script.
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # Optional: reduce peak memory in MSM (exact computation, chunked cdist)
+  msm_cdist_chunk_size: 16
+
+  adaptive_layer_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.02
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+    log_weights: true
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: false
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: -1.0
+
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: true
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: 0.15
+    calibration_quantiles: [0.1, 0.9]
+
+    patch_gate_enabled: true
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.1
+    patch_gate_smooth_kernel: 0
+    patch_gate_protect_quantile: 0.99
+    patch_gate_gate_threshold: 0.2
+
+    log_weights: true
+
+device: 0
+
+transductive:
+  enabled: true
+  num_passes: 2
+
+  # Bank selection
+  bank_ratio_mode: "adaptive_knee"
+  bank_ratio: 0.4
+  bank_ratio_min: 0.2
+  bank_ratio_max: 0.7
+  # defaults (not in CLI, but can be set here)
+  knee_strength_min: 0.03
+  knee_tail_frac: 0.85
+
+  # Bank decontamination
+  bank_filter: true
+
+  # Ref retrieval
+  retrieval_topk: 16
+
+  # Pass-0 score pooling
+  score_pool: "q99"
+
+  # MSM params
+  msm_topmin_min: 0.0
+  msm_topmin_max: 0.3
+
+  # safe_fusion + adaptive gate
+  safe_fusion: true
+  adaptive_gate: true
+  gate_threshold: 0.19
+
+  # Apply to pixel-level
+  apply_to_pixel: true
+
+testing:
+  output_dir: "output/exp_matrix_clip518_on"
+  vis: false
+  vis_type: single_norm
+  save_excel: true
+

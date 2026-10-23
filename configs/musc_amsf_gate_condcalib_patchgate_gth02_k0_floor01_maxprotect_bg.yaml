@@ -1,0 +1,71 @@
+# AMSF gate + conditional calibration + PatchGate (MaxProtect + BG-only).
+#
+# Key idea:
+# - Use `patch_gate_mode: background` so PatchGate only suppresses residuals on
+#   background patches (and keeps gate=1 on non-background patches).
+# - Use `patch_gate_protect_source: max_scale` so the background mask is derived
+#   from max-over-scales responses (more robust when the reference mean dilutes
+#   true anomalies).
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  msm_cdist_chunk_size: 8
+
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: true
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: 0.15
+    calibration_quantiles: [0.1, 0.9]
+
+    patch_gate_enabled: true
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.1
+    patch_gate_smooth_kernel: 0
+
+    # BG-only gating (protect non-background patches by construction).
+    patch_gate_mode: "background"
+    patch_gate_bg_percentile: 0.9
+
+    # MaxProtect: decide mask from max-over-scales map.
+    patch_gate_protect_quantile: 0.99
+    patch_gate_protect_source: "max_scale"
+    patch_gate_gate_threshold: 0.2
+
+    log_weights: true
+
+device: 1
+
+testing:
+  output_dir: "output_amsf_gate_condcalib_patchgate_gth02_k0_floor01_maxprotect_bg"
+  vis: False
+  vis_type: single_norm
+  save_excel: True
+

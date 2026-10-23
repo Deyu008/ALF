@@ -1,0 +1,76 @@
+# AMSF gate + conditional calibration (mean/std) + Adaptive Layer Fusion (ALF)
+#
+# ALF fuses per-layer MSM anomaly maps (across backbone layers) before the r-level
+# AMSF fusion. It is backbone-agnostic (no CLS usage) and complements the
+# gate+condcalib stability trick.
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # Adaptive Layer Fusion (ALF): fuse MSM maps across backbone layers
+  adaptive_layer_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    # For 4~8 layers, use a small floor; keep weights moderately diverse.
+    weight_floor: 0.02
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+    log_weights: true
+
+    # Optional: consistency-gated residual fusion across layers
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    # Keep calibration off for ALF by default (r-level condcalib already handles drift).
+    calibration_enabled: false
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: -1.0
+
+  # Adaptive R Fusion (AMSF): fuse across r values
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+
+    # Consistency-gated residual fusion
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    # Conditional calibration: only when consistency < threshold (low confidence)
+    calibration_enabled: true
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: 0.15
+    calibration_quantiles: [0.1, 0.9]
+    log_weights: true
+
+device: 1
+
+testing:
+  output_dir: "output_amsf_gate_condcalib_alf"
+  vis: False
+  vis_type: single_norm
+  save_excel: True
+

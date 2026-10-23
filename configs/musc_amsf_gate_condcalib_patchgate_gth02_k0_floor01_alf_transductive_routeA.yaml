@@ -1,0 +1,116 @@
+# All-on (AMSF+Gate+CondCalib+PatchGate + ALF) + Train-free transductive Route A (image-only)
+#
+# Route A goal:
+# - Keep pixel-level maps identical to Pass-0 (baseline MSM maps)
+# - Only modify the image-level scoring path via Pass-1 bank references
+#
+# Notes:
+# - This config uses a FIXED bank_ratio (mainline currently does not include adaptive_knee/bank_filter).
+# - Optional adaptive_gate uses knee_strength as a confidence-derived fusion weight.
+
+datasets:
+  dataset_name: "mvtec_ad"
+  data_path: ./data/mvtec_anomaly_detection/
+  class_name: "ALL"
+  img_resize: 518
+  divide_num: 1
+
+models:
+  backbone_name: "ViT-L-14-336"
+  pretrained: "openai"
+  batch_size: 4
+  feature_layers: [5, 11, 17, 23]
+  r_list: [1, 3, 5]
+
+  # Optional: reduce peak memory in MSM (exact computation, chunked cdist)
+  msm_cdist_chunk_size: 16
+
+  # Adaptive Layer Fusion (ALF): fuse MSM maps across backbone layers
+  adaptive_layer_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.02
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+    log_weights: true
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: false
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: -1.0
+
+  # Adaptive R Fusion (AMSF): fuse across r values
+  adaptive_r_fusion:
+    enabled: true
+    weighting_method: "sharpness"
+    temperature: 0.2
+    weight_floor: 0.1
+    weight_ceil: 0.7
+    saliency_percentile: 95.0
+    shrink_to_uniform: 0.1
+
+    consistency_gate_enabled: true
+    consistency_method: "topk_overlap"
+    consistency_topk_ratio: 0.01
+    consistency_tau: 0.5
+    consistency_beta: 10.0
+
+    calibration_enabled: true
+    calibration_method: "mean_std"
+    calibration_consistency_threshold: 0.15
+    calibration_quantiles: [0.1, 0.9]
+
+    patch_gate_enabled: true
+    patch_gate_method: "adjacent_agreement"
+    patch_gate_tau: 0.3
+    patch_gate_beta: 10.0
+    patch_gate_floor: 0.1
+    patch_gate_smooth_kernel: 0
+    patch_gate_protect_quantile: 0.99
+    patch_gate_gate_threshold: 0.2
+
+    log_weights: true
+
+device: 1
+
+transductive:
+  enabled: true
+  num_passes: 2
+
+  # Pass-0 score pooling used for bank selection.
+  score_pool: "q99"
+
+  # Fixed bank ratio (bottom p by Pass-0 scores). Keep conservative to reduce contamination.
+  bank_ratio: 0.4
+
+  # Optional: per-query retrieval within bank.
+  retrieval_topk: 16
+
+  # MSM interval mean parameters (keep defaults unless doing ablation)
+  msm_topmin_min: 0.0
+  msm_topmin_max: 0.3
+
+  # Route A: only apply transductive to image-level scoring; pixel maps remain Pass-0.
+  apply_to_pixel: false
+
+  # Fusion between Pass-0 and Pass-1 for image-level score.
+  # adaptive_gate overrides safe_fusion when enabled.
+  safe_fusion: true
+  safe_fusion_weight: 0.5
+
+  # Adaptive gating: fusion weight = knee_strength (computed from Pass-0 score curve).
+  adaptive_gate: true
+  gate_threshold: 0.05
+
+testing:
+  output_dir: "output/20260105_routeA_imgonly"
+  vis: False
+  vis_type: single_norm
+  save_excel: True
